@@ -37,8 +37,11 @@ window.onerror = function () { setTimeout(function () { location.reload(); }, 50
   var list = PLAYLIST.slides, i = -1, cur = null, next = null;
   if (PLAYLIST.chrome) chrome.src = PLAYLIST.chrome; else chrome.style.display = "none";
 
+  // fill the screen edge to edge (crop at most 10% on an odd shape) plus a slight zoom; ?zoom=1 turns the zoom off
+  var ZOOM = +(location.search.match(/zoom=([\d.]+)/) || [0, 1.03])[1];
   function fit() {
-    var s = Math.min(window.innerWidth / 1080, window.innerHeight / 1920);
+    var a = window.innerWidth / 1080, b = window.innerHeight / 1920;
+    var s = Math.min(Math.max(a, b), Math.min(a, b) * 1.1) * ZOOM;
     stage.style.webkitTransform = stage.style.transform = "scale(" + s + ")";
   }
   window.addEventListener("resize", fit); fit();
