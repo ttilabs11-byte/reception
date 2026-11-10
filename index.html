@@ -113,7 +113,7 @@ window.onerror = function () { setTimeout(function () { location.reload(); }, 50
   setTimeout(function () { location.reload(); }, 6 * 3600 * 1000);   // pick up new slides every 6 h
 
   // the Chrome fallback: work offline once loaded over http(s); a tap goes full screen in a plain browser tab
-  if (navigator.serviceWorker && /^http/.test(location.protocol)) navigator.serviceWorker.register("sw.js");
+  if (navigator.serviceWorker && /^http/.test(location.protocol)) navigator.serviceWorker.register(LIST == "main" ? "sw.js" : "sw.js?list=" + LIST);
   document.addEventListener("click", function () {
     var d = document.documentElement, f = d.requestFullscreen || d.webkitRequestFullscreen; if (f) f.call(d);
     if (videoAwake.v) videoAwake.v.play();             // in case autoplay was held back until a tap

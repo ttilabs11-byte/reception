@@ -1,11 +1,13 @@
 // Offline cache for the Chrome (PWA) fallback. The Android app plays from files and never uses this.
-// Install: cache the player and every slide the main playlist names. Fetch: network first, cache when offline,
+// Install: cache the player and every slide its playlist names (main unless registered with ?list=). Fetch: network first, cache when offline,
 // so copying new slides to the server shows up on the next load and the screen keeps playing if the network drops.
-var CACHE = "tti-screen";   // v2.4, 2026-10-31: no faces: 13 slides on real Tti shoot photos (labs, hands, from behind; Welcome = the Tti logo wall), 5 back on stock (any byte change here re-caches every slide)
+// Registered as sw.js?list=name for another edition (index.html), which then caches that playlist in its own cache.
+var LIST = (self.location.search.match(/list=([\w-]+)/) || [0, "main"])[1];
+var CACHE = "tti-screen" + (LIST == "main" ? "" : "-" + LIST);   // v2.7, 2026-11-06: Studio Photo images on 148 slides; v2.6, 2026-11-05: + Cosmetics, DPP & ESG, Microbiology, Citrus decks; v2.5, 2026-11-02: full-content edition (?list=full) (any byte change here re-caches every slide)
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) {
-    return fetch("playlists/main.js", { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (js) {
-      var files = (js.match(/slides\/[\w\/.-]+\.webp/g) || []).concat(["./", "index.html", "playlists/main.js",
+    return fetch("playlists/" + LIST + ".js", { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (js) {
+      var files = (js.match(/slides\/[\w\/.-]+\.webp/g) || []).concat(["./", "index.html", "playlists/" + LIST + ".js",
         "manifest.webmanifest", "icon-192.png", "icon-512.png"]);
       return c.addAll(files.filter(function (f, i) { return files.indexOf(f) === i; }));
     });
