@@ -65,12 +65,29 @@ window.onerror = function () { setTimeout(function () { location.reload(); }, 50
     el.t = d.t || "fade"; el.hold = d.hold || PLAYLIST.hold;
     return el;
   }
-  function ready(el, cb) {                              // wait until every layer is decoded, so a move never starts on a blank
-    var ms = el.fg ? [el.bg, el.fg] : [el.bg], left = ms.length, done = function () { if (--left === 0) cb(); };
+  function ready(el, cb) {                              // wait until every layer has loaded or failed, so a move never starts on a blank
+    var ms = el.fg ? [el.bg, el.fg] : [el.bg], left = ms.length, fired = false, to;
+    function finish() { if (!fired) { fired = true; clearTimeout(to); cb(); } }
+    function done() { if (--left <= 0) finish(); }
+    to = setTimeout(finish, 15000 / speed);             // a picture that never arrives (hung network) must not stop the loop
     ms.forEach(function (m) {
-      if (m.complete && m.naturalWidth) done(); else { m.onload = done; m.onerror = done; }
+      // complete is true for a loaded AND a failed picture; checking it after hooking the events catches a picture
+      // that failed before we got here (the old check missed that and froze the screen on one slide)
+      if (m.complete) done(); else { m.onload = done; m.onerror = done; }
     });
   }
+  var skips = 0, shown = Date.now();
+  function advance() {                                  // move on to the prepared slide; skip it if its picture failed
+    if (!next) { setTimeout(advance, 200); return; }
+    ready(next, function () {
+      if (next.bg.naturalWidth) { show(); return; }
+      i = (i + 1) % list.length;
+      if (++skips >= list.length) { setTimeout(function () { location.reload(); }, 30000); return; }   // nothing loads: retry in 30 s
+      prepare(); advance();
+    });
+  }
+  // last guard: if no slide has changed for 90 s, whatever the reason, start the player over
+  setInterval(function () { if (Date.now() - shown > 90000 / speed) location.reload(); }, 10000 / speed);
   function prepare() { next = build((i + 1) % list.length); }
 
   function show() {
@@ -92,9 +109,9 @@ window.onerror = function () { setTimeout(function () { location.reload(); }, 50
       if (inc.t === "wipe") { css(out.wrap, "translate3d(0,-22%,0)", null, T, EASE); css(out.dim, null, .7, T, EASE); }
       setTimeout(function () { stage.removeChild(out); }, T * 1.5);
     }
-    cur = inc;
+    cur = inc; skips = 0; shown = Date.now();
     setTimeout(prepare, T * 1.6);                       // load the next slide once this move is over
-    setTimeout(function wait() { if (next) ready(next, show); else setTimeout(wait, 200); }, HOLD);
+    setTimeout(advance, HOLD);
   }
 
   // keep the screen awake: Wake Lock where the browser has it (Chrome 84+), else a tiny muted looping video
@@ -119,7 +136,7 @@ window.onerror = function () { setTimeout(function () { location.reload(); }, 50
     if (videoAwake.v) videoAwake.v.play();             // in case autoplay was held back until a tap
   });
 
-  prepare(); ready(next, show);
+  prepare(); advance();
 })();
 </script>
 </body></html>
