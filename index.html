@@ -28,12 +28,23 @@ document.write('<script src="playlists/' + LIST + '.js"><\/script>');
 <div id="stage"><img id="chrome" alt=""></div>
 <script>
 // Plain ES5 for Android 7's WebView (Chromium 51+). Only the slide on screen and the next one are in memory.
-// PLAYLIST = { hold: ms, chrome: "path or empty", slides: [{ bg: "path", fg: "path (optional)", t: "wipe|fade", hold: ms (optional) }] }
+// PLAYLIST = { hold: ms, chrome: "path or empty", slides: [{ bg: "path", fg: "path (optional)", t: "wipe|fade", hold: ms (optional), mv: [from, to] transform (optional, for wide pictures) }] }
 window.onerror = function () { setTimeout(function () { location.reload(); }, 5000); };   // any script error: start over
 (function () {
   var stage = document.getElementById("stage"), chrome = document.getElementById("chrome");
   var speed = +(location.search.match(/speed=([\d.]+)/) || [0, 1])[1];
   var EASE = "cubic-bezier(.76,0,.24,1)", OUT = "cubic-bezier(.16,1,.3,1)";
+  // camera moves on the picture layer only (words and logo stay still), big enough to see while walking past (v3.5b:
+  // about twice v3.5's travel). Every move shifts less than the picture's overhang at that scale, so an edge never
+  // shows (work/test_motion.py checks). ?motion=0 = old gentle push
+  var MOVES = /motion=0/.test(location.search) ? [["scale(1)", "scale(1.04)"]] : [
+    ["scale(1.04)", "scale(1.26)"],                                                   // zoom in
+    ["translate3d(-8%,0,0) scale(1.24)", "translate3d(8%,0,0) scale(1.24)"],          // pan left to right
+    ["scale(1.26)", "scale(1.04)"],                                                   // zoom out
+    ["translate3d(5%,4%,0) scale(1.18)", "translate3d(-5%,-4%,0) scale(1.28)"],       // drift up and in
+    ["translate3d(8%,0,0) scale(1.24)", "translate3d(-8%,0,0) scale(1.24)"],          // pan right to left
+    ["translate3d(-5%,-4%,0) scale(1.28)", "translate3d(4%,3%,0) scale(1.16)"]        // drift down and out
+  ];
   var list = PLAYLIST.slides, i = -1, cur = null, next = null;
   if (PLAYLIST.chrome) chrome.src = PLAYLIST.chrome; else chrome.style.display = "none";
 
@@ -62,7 +73,7 @@ window.onerror = function () { setTimeout(function () { location.reload(); }, 50
     el.wrap = el.firstChild; el.par = el.wrap.firstChild; el.dim = el.wrap.lastChild;
     el.bg = img(d.bg, "bg"); el.par.appendChild(el.bg);
     if (d.fg) { el.fg = img(d.fg, "fg"); el.appendChild(el.fg); }
-    el.t = d.t || "fade"; el.hold = d.hold || PLAYLIST.hold;
+    el.t = d.t || "fade"; el.hold = d.hold || PLAYLIST.hold; el.mv = d.mv;
     return el;
   }
   function ready(el, cb) {                              // wait until every layer has loaded or failed, so a move never starts on a blank
@@ -96,13 +107,14 @@ window.onerror = function () { setTimeout(function () { location.reload(); }, 50
     // start states, no transition
     if (inc.t === "wipe") { css(inc.wrap, "translate3d(0,100%,0)", 1); css(inc.par, "translate3d(0,-70%,0)"); }
     else { css(inc.wrap, "translate3d(0,0,0)", 0); css(inc.par, "translate3d(0,0,0) scale(1.08)"); }
-    css(inc.bg, "scale(1)");
+    var mv = (inc.mv && !/motion=0/.test(location.search)) ? inc.mv : MOVES[i % MOVES.length];                   // each slide gets the next camera move: zoom in, pan, zoom out, drift
+    css(inc.bg, mv[0]);
     if (inc.fg) css(inc.fg, "translate3d(0,70px,0)", 0);
     stage.insertBefore(inc, chrome);
     inc.offsetWidth;                                    // commit the start state before the move
     if (inc.t === "wipe") { css(inc.wrap, "translate3d(0,0,0)", null, T, EASE); css(inc.par, "translate3d(0,0,0)", null, T, EASE); }
     else { css(inc.wrap, null, 1, T, EASE); css(inc.par, "translate3d(0,0,0) scale(1)", null, T * 1.4, OUT); }
-    css(inc.bg, "scale(" + (inc.fg ? 1.06 : 1.03) + ")", null, HOLD + T, "linear");   // the slow push while it holds
+    css(inc.bg, mv[1], null, HOLD + 2 * T, "linear");  // the picture keeps moving through the hold and the exit, like video
     if (inc.fg) css(inc.fg, "translate3d(0,0,0)", 1, 1000 / speed, OUT, T * .55);      // the words settle after the picture
     if (out) {
       if (out.fg) css(out.fg, "translate3d(0,-50px,0)", 0, 500 / speed, "cubic-bezier(.5,0,.75,0)");
