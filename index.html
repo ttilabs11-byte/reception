@@ -38,12 +38,12 @@ window.onerror = function () { setTimeout(function () { location.reload(); }, 50
   // about twice v3.5's travel). Every move shifts less than the picture's overhang at that scale, so an edge never
   // shows (work/test_motion.py checks). ?motion=0 = old gentle push
   var MOVES = /motion=0/.test(location.search) ? [["scale(1)", "scale(1.04)"]] : [
-    ["scale(1.04)", "scale(1.26)"],                                                   // zoom in
-    ["translate3d(-8%,0,0) scale(1.24)", "translate3d(8%,0,0) scale(1.24)"],          // pan left to right
-    ["scale(1.26)", "scale(1.04)"],                                                   // zoom out
-    ["translate3d(5%,4%,0) scale(1.18)", "translate3d(-5%,-4%,0) scale(1.28)"],       // drift up and in
-    ["translate3d(8%,0,0) scale(1.24)", "translate3d(-8%,0,0) scale(1.24)"],          // pan right to left
-    ["translate3d(-5%,-4%,0) scale(1.28)", "translate3d(4%,3%,0) scale(1.16)"]        // drift down and out
+    ["scale(1.04)", "scale(1.40)"],
+    ["translate3d(-12%,0,0) scale(1.36)", "translate3d(12%,0,0) scale(1.36)"],
+    ["scale(1.40)", "scale(1.04)"],
+    ["translate3d(8%,6%,0) scale(1.30)", "translate3d(-8%,-6%,0) scale(1.42)"],
+    ["translate3d(12%,0,0) scale(1.36)", "translate3d(-12%,0,0) scale(1.36)"],
+    ["translate3d(-8%,-6%,0) scale(1.42)", "translate3d(6%,5%,0) scale(1.28)"]
   ];
   var list = PLAYLIST.slides, i = -1, cur = null, next = null;
   if (PLAYLIST.chrome) chrome.src = PLAYLIST.chrome; else chrome.style.display = "none";
