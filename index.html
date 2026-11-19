@@ -53,7 +53,11 @@ function store(k, v) { try { if (v == null) return localStorage.getItem(k); loca
   var list = PLAYLIST.slides, cur = null, next = null, born = Date.now();
   // carry on from the slide we were on before a restart (hourly refresh, a crash, "Show original"), not from slide 1
   var i = +store("tti-slide-" + LIST); i = i >= 0 && i < list.length ? i - 1 : -1;
-  function at(el, xy) { if (xy) { el.style.left = xy[0] + "px"; el.style.top = xy[1] + "px"; } }
+  function at(el, xy) {                                 // place a trimmed layer; a full-size one (an old copy) stays at 0,0
+    if (!xy) return;
+    el.style.left = xy[0] + "px"; el.style.top = xy[1] + "px";
+    el.addEventListener("load", function () { if (el.naturalWidth == 1080 && el.naturalHeight == 1920) el.style.left = el.style.top = "0px"; });
+  }
   if (PLAYLIST.chrome) { chrome.src = PLAYLIST.chrome; at(chrome, PLAYLIST.chromeAt); } else chrome.style.display = "none";
 
   // fill the screen with a slight zoom (?zoom=1 turns it off), never cropping more than 40 design px off any edge,
