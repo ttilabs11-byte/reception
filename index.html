@@ -50,7 +50,7 @@ function store(k, v) { try { if (v == null) return localStorage.getItem(k); loca
     ["translate3d(12%,0,0) scale(1.36)", "translate3d(-12%,0,0) scale(1.36)"],
     ["translate3d(-8%,-6%,0) scale(1.42)", "translate3d(6%,5%,0) scale(1.28)"]
   ];
-  var list = PLAYLIST.slides, cur = null, next = null, born = Date.now();
+  var list = PLAYLIST.slides, cur = null, next = null, born = Date.now(), renew = false;
   // carry on from the slide we were on before a restart (hourly refresh, a crash, "Show original"), not from slide 1
   var i = +store("tti-slide-" + LIST); i = i >= 0 && i < list.length ? i - 1 : -1;
   function at(el, xy) {                                 // place a trimmed layer; a full-size one (an old copy) stays at 0,0
@@ -106,7 +106,7 @@ function store(k, v) { try { if (v == null) return localStorage.getItem(k); loca
   }
   function advance() {                                  // move on to the prepared slide; skip it if its picture failed
     // once an hour, between slides, start the page fresh so nothing builds up in memory; it resumes at the next slide
-    if (Date.now() - born > 3600000 / speed) { store("tti-slide-" + LIST, (i + 1) % list.length); location.reload(); return; }
+    if (renew || Date.now() - born > 3600000 / speed) { store("tti-slide-" + LIST, (i + 1) % list.length); location.reload(); return; }
     if (!next) { setTimeout(advance, 200); return; }
     ready(next, function () {
       if (next.bg.naturalWidth) { show(); return; }
@@ -159,7 +159,14 @@ function store(k, v) { try { if (v == null) return localStorage.getItem(k); loca
   lock(); document.addEventListener("visibilitychange", function () { if (!document.hidden) lock(); });
 
   // the Chrome fallback: work offline once loaded over http(s); a tap goes full screen in a plain browser tab
-  if (navigator.serviceWorker && /^http/.test(location.protocol)) navigator.serviceWorker.register(LIST == "main" ? "sw.js" : "sw.js?list=" + LIST);
+  // it also asks for a new version every 10 minutes, and when one takes over it starts fresh at the next slide
+  if (navigator.serviceWorker && /^http/.test(location.protocol)) {
+    var had = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener("controllerchange", function () { if (had) renew = true; had = true; });
+    navigator.serviceWorker.register(LIST == "main" ? "sw.js" : "sw.js?list=" + LIST).then(function (r) {
+      setInterval(function () { r.update().catch(function () {}); }, 600000 / speed);
+    }).catch(function () {});
+  }
   document.addEventListener("click", function () {
     var d = document.documentElement, f = d.requestFullscreen || d.webkitRequestFullscreen; if (f) f.call(d);
     if (videoAwake.v) videoAwake.v.play();             // in case autoplay was held back until a tap
