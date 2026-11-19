@@ -11,11 +11,15 @@
   /* the 1080×1920 design, scaled to whatever the screen reports */
   #stage { position: absolute; left: 50%; top: 50%; width: 1080px; height: 1920px; margin: -960px 0 0 -540px;
     overflow: hidden; background: #0B1D38; }
-  .slide, .wrap, .par, .bg, .fg, #chrome, .dim { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+  .slide, .wrap, .par, .bg, .dim { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+  /* words and logo are trimmed to their own size (render.py), placed at fx/fy: a full-frame see-through layer costs
+     as much memory as a photo */
+  .fg, #chrome { position: absolute; left: 0; top: 0; display: block; }
   .wrap { overflow: hidden; }
-  .bg, .fg, #chrome { display: block; }
+  .bg { display: block; }
   .dim { background: #0B1D38; opacity: 0; }
-  /* every move is transform or opacity only: composited, smooth on an old WebView */
+  /* every move is transform or opacity only: composited, smooth on an old WebView. Each layer stays its own, so nothing
+     is repainted into the full-screen stage (v3.6 test: dropping these doubled memory) */
   .wrap, .par, .bg, .fg, .dim { -webkit-backface-visibility: hidden; backface-visibility: hidden; will-change: transform, opacity; }
   #chrome { z-index: 100; }
 </style>
@@ -30,6 +34,7 @@ document.write('<script src="playlists/' + LIST + '.js"><\/script>');
 // Plain ES5 for Android 7's WebView (Chromium 51+). Only the slide on screen and the next one are in memory.
 // PLAYLIST = { hold: ms, chrome: "path or empty", slides: [{ bg: "path", fg: "path (optional)", t: "wipe|fade", hold: ms (optional), mv: [from, to] transform (optional, for wide pictures) }] }
 window.onerror = function () { setTimeout(function () { location.reload(); }, 5000); };   // any script error: start over
+function store(k, v) { try { if (v == null) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
 (function () {
   var stage = document.getElementById("stage"), chrome = document.getElementById("chrome");
   var speed = +(location.search.match(/speed=([\d.]+)/) || [0, 1])[1];
@@ -45,8 +50,11 @@ window.onerror = function () { setTimeout(function () { location.reload(); }, 50
     ["translate3d(12%,0,0) scale(1.36)", "translate3d(-12%,0,0) scale(1.36)"],
     ["translate3d(-8%,-6%,0) scale(1.42)", "translate3d(6%,5%,0) scale(1.28)"]
   ];
-  var list = PLAYLIST.slides, i = -1, cur = null, next = null;
-  if (PLAYLIST.chrome) chrome.src = PLAYLIST.chrome; else chrome.style.display = "none";
+  var list = PLAYLIST.slides, cur = null, next = null, born = Date.now();
+  // carry on from the slide we were on before a restart (hourly refresh, a crash, "Show original"), not from slide 1
+  var i = +store("tti-slide-" + LIST); i = i >= 0 && i < list.length ? i - 1 : -1;
+  function at(el, xy) { if (xy) { el.style.left = xy[0] + "px"; el.style.top = xy[1] + "px"; } }
+  if (PLAYLIST.chrome) { chrome.src = PLAYLIST.chrome; at(chrome, PLAYLIST.chromeAt); } else chrome.style.display = "none";
 
   // fill the screen with a slight zoom (?zoom=1 turns it off), never cropping more than 40 design px off any edge,
   // so the logo and the contact line stay whole
@@ -72,7 +80,7 @@ window.onerror = function () { setTimeout(function () { location.reload(); }, 50
     el.innerHTML = '<div class="wrap"><div class="par"></div><div class="dim"></div></div>';
     el.wrap = el.firstChild; el.par = el.wrap.firstChild; el.dim = el.wrap.lastChild;
     el.bg = img(d.bg, "bg"); el.par.appendChild(el.bg);
-    if (d.fg) { el.fg = img(d.fg, "fg"); el.appendChild(el.fg); }
+    if (d.fg) { el.fg = img(d.fg, "fg"); at(el.fg, d.fa); el.appendChild(el.fg); }
     el.t = d.t || "fade"; el.hold = d.hold || PLAYLIST.hold; el.mv = d.mv;
     return el;
   }
@@ -88,13 +96,19 @@ window.onerror = function () { setTimeout(function () { location.reload(); }, 50
     });
   }
   var skips = 0, shown = Date.now();
+  var BLANK = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
+  function free(el) {                                   // drop a finished slide's pictures now, not whenever memory is swept
+    el.bg.src = BLANK; if (el.fg) el.fg.src = BLANK;
+  }
   function advance() {                                  // move on to the prepared slide; skip it if its picture failed
+    // once an hour, between slides, start the page fresh so nothing builds up in memory; it resumes at the next slide
+    if (Date.now() - born > 3600000 / speed) { store("tti-slide-" + LIST, (i + 1) % list.length); location.reload(); return; }
     if (!next) { setTimeout(advance, 200); return; }
     ready(next, function () {
       if (next.bg.naturalWidth) { show(); return; }
       i = (i + 1) % list.length;
       if (++skips >= list.length) { setTimeout(function () { location.reload(); }, 30000); return; }   // nothing loads: retry in 30 s
-      prepare(); advance();
+      free(next); prepare(); advance();
     });
   }
   // last guard: if no slide has changed for 90 s, whatever the reason, start the player over
@@ -119,9 +133,9 @@ window.onerror = function () { setTimeout(function () { location.reload(); }, 50
     if (out) {
       if (out.fg) css(out.fg, "translate3d(0,-50px,0)", 0, 500 / speed, "cubic-bezier(.5,0,.75,0)");
       if (inc.t === "wipe") { css(out.wrap, "translate3d(0,-22%,0)", null, T, EASE); css(out.dim, null, .7, T, EASE); }
-      setTimeout(function () { stage.removeChild(out); }, T * 1.5);
+      setTimeout(function () { stage.removeChild(out); free(out); }, T * 1.5);
     }
-    cur = inc; skips = 0; shown = Date.now();
+    cur = inc; skips = 0; shown = Date.now(); store("tti-slide-" + LIST, i);
     setTimeout(prepare, T * 1.6);                       // load the next slide once this move is over
     setTimeout(advance, HOLD);
   }
@@ -139,7 +153,6 @@ window.onerror = function () { setTimeout(function () { location.reload(); }, 50
   }
   function lock() { if (navigator.wakeLock) navigator.wakeLock.request("screen").catch(videoAwake); else videoAwake(); }
   lock(); document.addEventListener("visibilitychange", function () { if (!document.hidden) lock(); });
-  setTimeout(function () { location.reload(); }, 6 * 3600 * 1000);   // pick up new slides every 6 h
 
   // the Chrome fallback: work offline once loaded over http(s); a tap goes full screen in a plain browser tab
   if (navigator.serviceWorker && /^http/.test(location.protocol)) navigator.serviceWorker.register(LIST == "main" ? "sw.js" : "sw.js?list=" + LIST);
