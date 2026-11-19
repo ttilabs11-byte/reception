@@ -7,7 +7,7 @@ var PLAYLIST = {
     {"bg": "slides/lobby/s01-bg.webp", "fg": "slides/lobby/s01-txt.webp", "fa": [46, 1092], "t": "fade"},
     {"bg": "slides/lobby/s11-bg.webp", "fg": "slides/lobby/s11-txt.webp", "fa": [46, 1148], "t": "fade", "mv": ["translate3d(0,2%,0) scale(1.04)", "translate3d(0,-1.5%,0) scale(1.08)"]},
     {"bg": "slides/23-testing/s01-bg.webp", "fg": "slides/23-testing/s01-txt.webp", "fa": [76, 1150], "t": "fade"},
-    {"bg": "slides/23-testing/s02-bg.webp", "fg": "slides/23-testing/s02-txt.webp", "fa": [76, 982], "t": "wipe"},
+    {"bg": "slides/23-testing/s02-bg.webp", "fg": "slides/23-testing/s02-txt.webp", "fa": [76, 980], "t": "wipe"},
     {"bg": "slides/23-testing/s04-bg.webp", "fg": "slides/23-testing/s04-txt.webp", "fa": [76, 1430], "t": "wipe"},
     {"bg": "slides/23-testing/s05-bg.webp", "fg": "slides/23-testing/s05-txt.webp", "fa": [76, 720], "t": "fade"},
     {"bg": "slides/lobby/s16-bg.webp", "fg": "slides/lobby/s16-txt.webp", "fa": [46, 1036], "t": "fade"},
