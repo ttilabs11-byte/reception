@@ -96,7 +96,10 @@ function store(k, v) { try { if (v == null) return localStorage.getItem(k); loca
     ms.forEach(function (m) {
       // complete is true for a loaded AND a failed picture; checking it after hooking the events catches a picture
       // that failed before we got here (the old check missed that and froze the screen on one slide)
-      if (m.complete) done(); else { m.onload = done; m.onerror = done; }
+      // unpack the picture now, off the main thread, so the slide change never waits for it (v4.0: a 1080x1920 picture
+      // unpacked on first draw held back the first frames of every change, a small stutter on the TV box)
+      function got() { if (m.decode && m.naturalWidth) m.decode().then(done, done); else done(); }
+      if (m.complete) got(); else { m.onload = got; m.onerror = done; }
     });
   }
   var skips = 0, shown = Date.now();
@@ -130,15 +133,23 @@ function store(k, v) { try { if (v == null) return localStorage.getItem(k); loca
     if (inc.fg) css(inc.fg, "translate3d(0,70px,0)", 0);
     stage.insertBefore(inc, chrome);
     inc.offsetWidth;                                    // commit the start state before the move
-    if (inc.t === "wipe") { css(inc.wrap, "translate3d(0,0,0)", null, T, EASE); css(inc.par, "translate3d(0,0,0)", null, T, EASE); }
-    else { css(inc.wrap, null, 1, T, EASE); css(inc.par, "translate3d(0,0,0) scale(1)", null, T * 1.4, OUT); }
-    css(inc.bg, mv[1], null, HOLD + 2 * T, "linear");  // the picture keeps moving through the hold and the exit, like video
-    if (inc.fg) css(inc.fg, "translate3d(0,0,0)", 1, 1000 / speed, OUT, T * .55);      // the words settle after the picture
-    if (out) {
-      if (out.fg) css(out.fg, "translate3d(0,-50px,0)", 0, 500 / speed, "cubic-bezier(.5,0,.75,0)");
-      if (inc.t === "wipe") { css(out.wrap, "translate3d(0,-22%,0)", null, T, EASE); css(out.dim, null, .7, T, EASE); }
-      setTimeout(function () { stage.removeChild(out); free(out); }, T * 1.5);
+    // v4.0: the new slide is on the page but still out of sight (below the screen or see-through); give the browser
+    // two frames to set up its layers there, so the move itself starts on a ready slide (no hitch on a slow TV box)
+    var went = false;
+    function go() {
+      if (went) return; went = true;
+      if (inc.t === "wipe") { css(inc.wrap, "translate3d(0,0,0)", null, T, EASE); css(inc.par, "translate3d(0,0,0)", null, T, EASE); }
+      else { css(inc.wrap, null, 1, T, EASE); css(inc.par, "translate3d(0,0,0) scale(1)", null, T * 1.4, OUT); }
+      css(inc.bg, mv[1], null, HOLD + 2 * T, "linear");  // the picture keeps moving through the hold and the exit, like video
+      if (inc.fg) css(inc.fg, "translate3d(0,0,0)", 1, 1000 / speed, OUT, T * .55);      // the words settle after the picture
+      if (out) {
+        if (out.fg) css(out.fg, "translate3d(0,-50px,0)", 0, 500 / speed, "cubic-bezier(.5,0,.75,0)");
+        if (inc.t === "wipe") { css(out.wrap, "translate3d(0,-22%,0)", null, T, EASE); css(out.dim, null, .7, T, EASE); }
+        setTimeout(function () { stage.removeChild(out); free(out); }, T * 1.5);
+      }
     }
+    if (window.requestAnimationFrame) requestAnimationFrame(function () { requestAnimationFrame(go); });
+    setTimeout(go, 250);                                // a hidden page gets no frames: start the move anyway
     cur = inc; skips = 0; shown = Date.now(); store("tti-slide-" + LIST, i);
     setTimeout(prepare, T * 1.6);                       // load the next slide once this move is over
     setTimeout(advance, HOLD);
